@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SmartPark — Parking Management System</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0c10;
+    --surface: #12151c;
+    --surface2: #1a1f2e;
+    --border: #252b3b;
+    --accent-ev: #00e5ff;
+    --accent-normal: #ff9f1c;
+    --occupied: #ff3d5a;
+    --free: #1eff8e;
+    --text: #e8eaf0;
+    --muted: #6b7280;
+    --glow-ev: 0 0 20px rgba(0,229,255,0.3);
+    --glow-normal: 0 0 20px rgba(255,159,28,0.3);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Syne', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: 
+      linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 24px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Header */
+  header {
+    padding: 28px 0 20px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 40px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .header-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .logo {
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -1px;
+  }
+
+  .logo span:first-child { color: var(--accent-ev); }
+  .logo span:last-child { color: var(--text); }
+
+  .stats-bar {
+    display: flex;
+    gap: 24px;
+  }
+
+  .stat {
+    text-align: center;
+  }
+
+  .stat-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 22px;
+    font-weight: 700;
+  }
+
+  .stat-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .stat.ev .stat-value { color: var(--accent-ev); }
+  .stat.normal .stat-value { color: var(--accent-normal); }
+  .stat.total .stat-value { color: var(--free); }
+
+  /* Main layout */
+  .main-grid {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 28px;
+    align-items: start;
+  }
+
+  @media (max-width: 900px) {
+    .main-grid { grid-template-columns: 1fr; }
+  }
+
+  /* Section titles */
+  .section-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--muted);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* Lot area */
+  .lot-section { }
+
+  .lot-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+
+  .lot-tab {
+    padding: 8px 20px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .lot-tab.active.ev { 
+    border-color: var(--accent-ev);
+    color: var(--accent-ev);
+    background: rgba(0,229,255,0.08);
+  }
+
+  .lot-tab.active.normal { 
+    border-color: var(--accent-normal);
+    color: var(--accent-normal);
+    background: rgba(255,159,28,0.08);
+  }
+
+  .lot-tab:not(.active):hover { border-color: var(--muted); color: var(--text); }
+
+  /* Parking grid */
+  .parking-lot {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .parking-lot.ev-lot { border-color: rgba(0,229,255,0.2); }
+  .parking-lot.normal-lot { border-color: rgba(255,159,28,0.2); }
+
+  .lot-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+  }
+
+  .lot-title {
+    font-size: 18px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .lot-badge {
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+  }
+
+  .ev-badge { background: rgba(0,229,255,0.15); color: var(--accent-ev); }
+  .normal-badge { background: rgba(255,159,28,0.15); color: var(--accent-normal); }
+
+  .slots-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+    gap: 12px;
+  }
+
+  .slot {
+    aspect-ratio: 1;
+    border-radius: 10px;
+    border: 2px solid;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.25s;
+    position: relative;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  .slot::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity 0.25s;
+  }
+
+  .slot:hover::before { opacity: 1; }
+
+  .slot.free {
+    border-color: rgba(30, 255, 142, 0.4);
+    background: rgba(30, 255, 142, 0.05);
+  }
+
+  .slot.free::before { background: rgba(30, 255, 142, 0.08); }
+  .slot.free:hover { border-color: var(--free); box-shadow: 0 0 14px rgba(30,255,142,0.2); }
+
+  .slot.occupied {
+    border-color: rgba(255, 61, 90, 0.4);
+    background: rgba(255, 61, 90, 0.08);
+    cursor: default;
+  }
+
+  .slot.nearest {
+    animation: pulse-nearest 1.5s ease-in-out infinite;
+  }
+
+  @keyframes pulse-nearest {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(30,255,142,0.4); }
+    50% { box-shadow: 0 0 0 8px rgba(30,255,142,0); }
+  }
+
+  .slot-number {
+    font-family: 'Space Mono', monospace;
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .slot.free .slot-number { color: var(--free); }
+  .slot.occupied .slot-number { color: var(--occupied); }
+
+  .slot-status {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 4px;
+  }
+
+  .slot.free .slot-status { color: rgba(30,255,142,0.6); }
+  .slot.occupied .slot-status { color: rgba(255,61,90,0.6); }
+
+  .slot-car {
+    font-size: 9px;
+    color: var(--muted);
+    margin-top: 2px;
+    text-align: center;
+    padding: 0 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 80px;
+  }
+
+  .nearest-tag {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    font-size: 8px;
+    background: var(--free);
+    color: var(--bg);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+
+  /* Add slot button */
+  .add-slot-btn {
+    aspect-ratio: 1;
+    border-radius: 10px;
+    border: 2px dashed var(--border);
+    background: transparent;
+    color: var(--muted);
+    font-size: 28px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Syne', sans-serif;
+  }
+
+  .add-slot-btn:hover {
+    border-color: var(--text);
+    color: var(--text);
+    background: rgba(255,255,255,0.03);
+  }
+
+  /* Right sidebar */
+  .sidebar { display: flex; flex-direction: column; gap: 20px; }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+  }
+
+  /* Check-in form */
+  .checkin-form { display: flex; flex-direction: column; gap: 14px; }
+
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+
+  label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+  }
+
+  input, select {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 11px 14px;
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  input:focus, select:focus { border-color: var(--accent-ev); }
+
+  select option { background: var(--surface2); }
+
+  .type-toggle {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .type-btn {
+    padding: 10px;
+    border-radius: 8px;
+    border: 2px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+  }
+
+  .type-btn.active.ev {
+    border-color: var(--accent-ev);
+    color: var(--accent-ev);
+    background: rgba(0,229,255,0.1);
+  }
+
+  .type-btn.active.normal {
+    border-color: var(--accent-normal);
+    color: var(--accent-normal);
+    background: rgba(255,159,28,0.1);
+  }
+
+  .checkin-btn {
+    padding: 13px;
+    border-radius: 10px;
+    border: none;
+    background: var(--accent-ev);
+    color: var(--bg);
+    font-family: 'Syne', sans-serif;
+    font-size: 14px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.5px;
+  }
+
+  .checkin-btn:hover { opacity: 0.85; transform: translateY(-1px); }
+  .checkin-btn:active { transform: translateY(0); }
+
+  .checkin-btn.normal { background: var(--accent-normal); }
+
+  /* Assigned slot display */
+  .assigned-display {
+    display: none;
+    background: var(--surface2);
+    border-radius: 10px;
+    padding: 16px;
+    text-align: center;
+    border: 1px solid rgba(30,255,142,0.3);
+  }
+
+  .assigned-display.show { display: block; }
+
+  .assigned-slot-num {
+    font-family: 'Space Mono', monospace;
+    font-size: 42px;
+    font-weight: 700;
+    color: var(--free);
+    line-height: 1;
+  }
+
+  .assigned-text {
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 4px;
+  }
+
+  .assigned-type {
+    font-size: 12px;
+    margin-top: 8px;
+    font-weight: 600;
+  }
+
+  /* Active sessions */
+  .sessions-list { display: flex; flex-direction: column; gap: 10px; max-height: 320px; overflow-y: auto; }
+
+  .sessions-list::-webkit-scrollbar { width: 4px; }
+  .sessions-list::-webkit-scrollbar-track { background: transparent; }
+  .sessions-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .session-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .session-slot {
+    font-family: 'Space Mono', monospace;
+    font-size: 20px;
+    font-weight: 700;
+    min-width: 36px;
+    text-align: center;
+  }
+
+  .session-slot.ev { color: var(--accent-ev); }
+  .session-slot.normal { color: var(--accent-normal); }
+
+  .session-info { flex: 1; min-width: 0; }
+
+  .session-plate {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .session-meta {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 2px;
+    display: flex;
+    gap: 8px;
+  }
+
+  .session-type-badge {
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-weight: 700;
+  }
+
+  .session-type-badge.ev { background: rgba(0,229,255,0.15); color: var(--accent-ev); }
+  .session-type-badge.normal { background: rgba(255,159,28,0.15); color: var(--accent-normal); }
+
+  .leave-btn {
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: 1px solid rgba(255,61,90,0.4);
+    background: rgba(255,61,90,0.08);
+    color: var(--occupied);
+    font-family: 'Syne', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .leave-btn:hover { background: rgba(255,61,90,0.2); border-color: var(--occupied); }
+
+  .empty-state {
+    text-align: center;
+    padding: 24px;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  /* Toast */
+  .toast-container {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 999;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .toast {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 18px;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    animation: toast-in 0.3s ease;
+    min-width: 260px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  }
+
+  .toast.success { border-left: 3px solid var(--free); }
+  .toast.error { border-left: 3px solid var(--occupied); }
+  .toast.info { border-left: 3px solid var(--accent-ev); }
+
+  @keyframes toast-in {
+    from { transform: translateX(120%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+
+  @keyframes toast-out {
+    from { transform: translateX(0); opacity: 1; }
+    to { transform: translateX(120%); opacity: 0; }
+  }
+
+  /* Add slot panel */
+  .add-slot-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .add-btn {
+    padding: 11px;
+    border-radius: 8px;
+    border: none;
+    background: var(--surface2);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 1px solid var(--border);
+  }
+
+  .add-btn:hover { border-color: var(--text); }
+  .add-btn.ev-add:hover { border-color: var(--accent-ev); color: var(--accent-ev); }
+  .add-btn.normal-add:hover { border-color: var(--accent-normal); color: var(--accent-normal); }
+
+  /* Hidden tab content */
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* Timer */
+  .session-timer {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <div class="header-inner">
+      <div class="logo">
+        <span>Smart</span><span>Park</span>
+      </div>
+      <div class="stats-bar">
+        <div class="stat ev">
+          <div class="stat-value" id="ev-free-count">0</div>
+          <div class="stat-label">EV Free</div>
+        </div>
+        <div class="stat normal">
+          <div class="stat-value" id="normal-free-count">0</div>
+          <div class="stat-label">Normal Free</div>
+        </div>
+        <div class="stat total">
+          <div class="stat-value" id="total-occupied">0</div>
+          <div class="stat-label">Occupied</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="main-grid">
+    <!-- Parking lots -->
+    <div class="lot-section">
+      <div class="lot-tabs">
+        <button class="lot-tab active ev" onclick="switchTab('ev')">⚡ EV Slots</button>
+        <button class="lot-tab normal" onclick="switchTab('normal')">🚗 Normal Slots</button>
+      </div>
+
+      <!-- EV lot -->
+      <div id="tab-ev" class="tab-content active">
+        <div class="parking-lot ev-lot">
+          <div class="lot-header">
+            <div class="lot-title">
+              EV Charging Lot
+              <span class="lot-badge ev-badge">⚡ ELECTRIC</span>
+            </div>
+          </div>
+          <div class="slots-grid" id="ev-slots-grid">
+            <!-- Slots rendered by JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Normal lot -->
+      <div id="tab-normal" class="tab-content">
+        <div class="parking-lot normal-lot">
+          <div class="lot-header">
+            <div class="lot-title">
+              Standard Lot
+              <span class="lot-badge normal-badge">🚗 STANDARD</span>
+            </div>
+          </div>
+          <div class="slots-grid" id="normal-slots-grid">
+            <!-- Slots rendered by JS -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <!-- Check-in -->
+      <div class="panel">
+        <div class="section-title">Check In</div>
+        <div class="checkin-form">
+          <div class="form-group">
+            <label>Vehicle Type</label>
+            <div class="type-toggle">
+              <button class="type-btn active ev" id="type-ev" onclick="selectType('ev')">⚡ EV</button>
+              <button class="type-btn normal" id="type-normal" onclick="selectType('normal')">🚗 Normal</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>License Plate</label>
+            <input type="text" id="plate-input" placeholder="e.g. DL 01 AB 1234" maxlength="15">
+          </div>
+          <div id="assigned-display" class="assigned-display">
+            <div class="assigned-slot-num" id="assigned-num">—</div>
+            <div class="assigned-text">Nearest Available Slot</div>
+            <div class="assigned-type" id="assigned-type-text"></div>
+          </div>
+          <button class="checkin-btn" id="checkin-btn" onclick="checkIn()">FIND & ASSIGN SLOT</button>
+        </div>
+      </div>
+
+      <!-- Add slots -->
+      <div class="panel">
+        <div class="section-title">Add Parking Slots</div>
+        <div class="add-slot-form">
+          <button class="add-btn ev-add" onclick="addSlot('ev')">+ Add EV Slot</button>
+          <button class="add-btn normal-add" onclick="addSlot('normal')">+ Add Normal Slot</button>
+        </div>
+      </div>
+
+      <!-- Active sessions -->
+      <div class="panel">
+        <div class="section-title">Active Sessions</div>
+        <div class="sessions-list" id="sessions-list">
+          <div class="empty-state">No vehicles parked yet</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+
+<script>
+  // State
+  const state = {
+    evSlots: [],
+    normalSlots: [],
+    sessions: [],
+    selectedType: 'ev',
+    nextEvId: 1,
+    nextNormalId: 1,
+    lastAssigned: null
+  };
+
+  // Init with some default slots
+  function init() {
+    for (let i = 0; i < 6; i++) addSlot('ev', true);
+    for (let i = 0; i < 8; i++) addSlot('normal', true);
+    render();
+  }
+
+  function addSlot(type, silent = false) {
+    if (type === 'ev') {
+      state.evSlots.push({ id: state.nextEvId++, type: 'ev', occupied: false, plate: null, sessionId: null });
+    } else {
+      state.normalSlots.push({ id: state.nextNormalId++, type: 'normal', occupied: false, plate: null, sessionId: null });
+    }
+    render();
+    if (!silent) {
+      showToast(`New ${type === 'ev' ? '⚡ EV' : '🚗 Normal'} slot added!`, 'info');
+      switchTab(type);
+    }
+  }
+
+  function selectType(type) {
+    state.selectedType = type;
+    document.getElementById('type-ev').className = `type-btn ${type === 'ev' ? 'active ev' : ''}`;
+    document.getElementById('type-normal').className = `type-btn ${type === 'normal' ? 'active normal' : ''}`;
+    document.getElementById('checkin-btn').className = `checkin-btn ${type === 'normal' ? 'normal' : ''}`;
+
+    // Reset assigned display
+    state.lastAssigned = null;
+    document.getElementById('assigned-display').classList.remove('show');
+  }
+
+  function getNearestSlot(type) {
+    const slots = type === 'ev' ? state.evSlots : state.normalSlots;
+    return slots.find(s => !s.occupied) || null;
+  }
+
+  function checkIn() {
+    const plate = document.getElementById('plate-input').value.trim().toUpperCase();
+    if (!plate) { showToast('Please enter a license plate number', 'error'); return; }
+
+    const type = state.selectedType;
+    const slot = getNearestSlot(type);
+    if (!slot) {
+      showToast(`No free ${type === 'ev' ? 'EV' : 'Normal'} slots available!`, 'error');
+      return;
+    }
+
+    // Assign
+    slot.occupied = true;
+    slot.plate = plate;
+    const sessionId = Date.now();
+    slot.sessionId = sessionId;
+
+    state.sessions.push({
+      id: sessionId,
+      slotId: slot.id,
+      type,
+      plate,
+      startTime: Date.now()
+    });
+
+    state.lastAssigned = slot;
+
+    // Show assigned
+    document.getElementById('assigned-num').textContent = slot.id;
+    document.getElementById('assigned-type-text').textContent = type === 'ev' ? '⚡ EV Charging Slot' : '🚗 Standard Slot';
+    document.getElementById('assigned-display').classList.add('show');
+
+    document.getElementById('plate-input').value = '';
+
+    render();
+    switchTab(type);
+    showToast(`🅿️ Slot ${slot.id} assigned to ${plate}`, 'success');
+  }
+
+  function leave(sessionId) {
+    const session = state.sessions.find(s => s.id === sessionId);
+    if (!session) return;
+
+    const slots = session.type === 'ev' ? state.evSlots : state.normalSlots;
+    const slot = slots.find(s => s.id === session.slotId);
+    if (slot) {
+      slot.occupied = false;
+      slot.plate = null;
+      slot.sessionId = null;
+    }
+
+    state.sessions = state.sessions.filter(s => s.id !== sessionId);
+
+    if (state.lastAssigned && state.lastAssigned.id === session.slotId) {
+      state.lastAssigned = null;
+      document.getElementById('assigned-display').classList.remove('show');
+    }
+
+    render();
+    showToast(`✓ ${session.plate} has left. Slot ${session.slotId} is now free.`, 'info');
+  }
+
+  function switchTab(type) {
+    document.getElementById('tab-ev').classList.toggle('active', type === 'ev');
+    document.getElementById('tab-normal').classList.toggle('active', type === 'normal');
+    document.querySelectorAll('.lot-tab').forEach(t => t.classList.remove('active'));
+    const tab = document.querySelector(`.lot-tab.${type}`);
+    if (tab) tab.classList.add('active');
+  }
+
+  function renderSlots(slots, gridId, type) {
+    const grid = document.getElementById(gridId);
+    const nearest = slots.find(s => !s.occupied);
+
+    grid.innerHTML = slots.map(slot => {
+      const isNearest = nearest && slot.id === nearest.id;
+      return `
+        <div class="slot ${slot.occupied ? 'occupied' : 'free'} ${isNearest && !slot.occupied ? 'nearest' : ''}" 
+             onclick="${!slot.occupied ? `onSlotClick(${slot.id}, '${type}')` : ''}">
+          ${isNearest && !slot.occupied ? '<span class="nearest-tag">NEXT</span>' : ''}
+          <div class="slot-number">${slot.id}</div>
+          <div class="slot-status">${slot.occupied ? 'TAKEN' : 'FREE'}</div>
+          ${slot.plate ? `<div class="slot-car">${slot.plate}</div>` : ''}
+        </div>
+      `;
+    }).join('');
+
+    // Add slot button
+    grid.innerHTML += `<button class="add-slot-btn" onclick="addSlot('${type}')">+</button>`;
+  }
+
+  function onSlotClick(slotId, type) {
+    // Pre-fill check in for this type
+    selectType(type);
+    switchTab(type);
+    document.getElementById('plate-input').focus();
+  }
+
+  function renderSessions() {
+    const list = document.getElementById('sessions-list');
+    if (state.sessions.length === 0) {
+      list.innerHTML = '<div class="empty-state">No vehicles parked yet</div>';
+      return;
+    }
+
+    list.innerHTML = state.sessions.map(s => {
+      const dur = Math.floor((Date.now() - s.startTime) / 60000);
+      return `
+        <div class="session-card">
+          <div class="session-slot ${s.type}">${s.slotId}</div>
+          <div class="session-info">
+            <div class="session-plate">${s.plate}</div>
+            <div class="session-meta">
+              <span class="session-type-badge ${s.type}">${s.type === 'ev' ? '⚡ EV' : '🚗'}</span>
+              <span class="session-timer">${dur < 1 ? 'just now' : dur + 'm ago'}</span>
+            </div>
+          </div>
+          <button class="leave-btn" onclick="leave(${s.id})">Leave</button>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function updateStats() {
+    const evFree = state.evSlots.filter(s => !s.occupied).length;
+    const normalFree = state.normalSlots.filter(s => !s.occupied).length;
+    const totalOccupied = state.sessions.length;
+    document.getElementById('ev-free-count').textContent = evFree;
+    document.getElementById('normal-free-count').textContent = normalFree;
+    document.getElementById('total-occupied').textContent = totalOccupied;
+  }
+
+  function render() {
+    renderSlots(state.evSlots, 'ev-slots-grid', 'ev');
+    renderSlots(state.normalSlots, 'normal-slots-grid', 'normal');
+    renderSessions();
+    updateStats();
+  }
+
+  function showToast(msg, type = 'info') {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.textContent = msg;
+    container.appendChild(toast);
+    setTimeout(() => {
+      toast.style.animation = 'toast-out 0.3s ease forwards';
+      setTimeout(() => toast.remove(), 300);
+    }, 3000);
+  }
+
+  // Refresh timers every 30s
+  setInterval(renderSessions, 30000);
+
+  init();
+</script>
+</body>
+</html>
